@@ -1,0 +1,18 @@
+"Perl Embedded HTML" Page Cache
+
+-------------------------------------------------------------------
+
+This module is more useful when you also use FastCGI or
+Apache/mod_perl.  If you are not using one of these packages yet,
+investigate that first.
+
+* Easier than HTML::Embperl
+
+* Does not require a separate binary like eperl
+
+-------------------------------------------------------------------
+
+Copyright (c) 1997 Joshua Nathaniel Pritikin.  All rights reserved.
+
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.

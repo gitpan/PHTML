@@ -1,0 +1,8 @@
+Either get the Maker package.
+
+  or
+
+Install by hand.  Only these files are required:
+
+./lib/perl5/site_perl/Experimental/Eval.pm
+./lib/perl5/site_perl/HTML/PHTML.pm
