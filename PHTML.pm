@@ -93,7 +93,7 @@ use integer;
 use Carp;
 use vars qw($VERSION);
 
-$VERSION='1.01';
+$VERSION='1.02';
 
 sub new {
     my ($class, $dir) = @_;
@@ -159,15 +159,12 @@ This module is more useful when you also use FastCGI or
 Apache/mod_perl.  If you are not using one of these packages yet,
 investigate that first.
 
-Most HTML::* modules are wrappers around string manipulation.  This
-module actually does something:
-
 For each C<$page_name>, the file C<$page_name.phtml> is loaded from
 the given directory.  The code is executed and HTML is appended to
 C<$B> in the calling package.  Optionally, per-page code is executed
 before any page is built.
 
-This is much more general and easy than HTML::Embperl and does not
+This is more general and easier than HTML::Embperl and does not
 need a separate binary like ePerl.
 
 =head1 PAGE STRUCTURE

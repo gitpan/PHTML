@@ -1,10 +1,9 @@
-Eval.pm
-INSTALL
+Eval/Eval.pm
+Eval/Makefile.PL
 MANIFEST
-MANIFEST.bak
+Makefile.PL
 PHTML.pm
 README
-be
 t/b1.good
 t/b2.good
 t/basic.t

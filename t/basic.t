@@ -40,10 +40,10 @@ sub go {
 sub check {
     my ($new,$old) = @_;
     if (-e $old) {
-	system("diff $new $old")==0? ok:not_ok;
+	system("diff $old $new")==0? ok:not_ok;
 	unlink $new;
     } else {
-	system("cp $new $old")==0? ok:not_ok;
+	system("mv $new $old")==0? ok:not_ok;
     }
 }
 
