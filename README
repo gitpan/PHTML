@@ -2,17 +2,32 @@
 
 -------------------------------------------------------------------
 
-This module is more useful when you also use FastCGI or
-Apache/mod_perl.  If you are not using one of these packages yet,
-investigate that first.
+This module requires FastCGI or Apache/mod_perl.  If you are not using
+one of these packages, investigate that first.
 
 * Easier than HTML::Embperl
 
 * Does not require a separate binary like eperl
 
+Accepts page source code that looks like this:
+
+ <body bgcolor="#ffffff" text="#000000" link="#000000" vlink="#000000" >
+ <center><h1><big>
+ <: small_caps("Mondo Server") :>
+ </big></h1></center>
+ <p>
+
+Perl source code is quoted between <: and :> symbols.  These quotes
+are matched at the beginning/end of lines.  Your PHTML code is
+rewritten into a single block, so you can declare lexical variables or
+loops and continue them further down the page.
+
+It's all very simple and easy.
+
+Get it from http://www.perl.com/CPAN/authors/id/JPRIT/!
+
 -------------------------------------------------------------------
 
 Copyright (c) 1997 Joshua Nathaniel Pritikin.  All rights reserved.
-
 This package is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

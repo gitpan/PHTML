@@ -4,11 +4,10 @@ use integer;
 use Carp;
 use IO::File;
 use File::stat;
-require Experimental::Eval;
 
 sub new {
-    my ($class, $pkg, $src) = @_;
-    bless { pkg => $pkg, src => $src }, $class;
+    my ($class, $pkg, $src, $noappend) = @_;
+    bless { pkg => $pkg, src => $src, noappend => $noappend }, $class;
 }
 
 sub reload {
@@ -21,11 +20,14 @@ sub reload {
 
     my $fh = new IO::File;
     $fh->open($pg->{src}) or die "open $pg->{src}: $!";
-    my $C = "package $pg->{pkg}; sub {\n";
+
+    # It seems like switching packages invalidates the #line directive?
+    # I didn't fully investigate it.
+
+    my $C = qq'package $pg->{pkg}; sub {\n#line 1 "$pg->{src}"\n';
     my $line = 0;
     my $prefix = '$B.=';
     my $reply = 'sub {0}';
-    my $reply_line = 0;
     while (1) {
 	my $l = <$fh>;
 	last if !defined $l;
@@ -41,13 +43,10 @@ sub reload {
 		$l .= $tmp;
 		$line++;
 	    }
-	    if ($l =~ m/^\s*\}/ or
-		$l =~ m/^\s*my/ or
-		$l =~ m/^\s*try_(?:read|update|abort_only)/) {
+	    if ($pg->{noappend}->($l)) {
 		$C .= "$l\n";
 	    } elsif ($l =~ /^\s*sub\s*\{/) {
-		$reply = "package $pg->{pkg}; $l";
-		$reply_line = $begin;
+		$reply = qq'package $pg->{pkg};\n#line $begin "$pg->{src}"\n$l';
 	    } else {
 		$C .= $prefix." $l;\n";
 	    }
@@ -58,14 +57,16 @@ sub reload {
     $C .= ";1 };";     # return 1 if we have built a page
     if ($debug) {
 	print "$pg->{src} " . "-"x(74-length($pg->{src})) . "\n";
-	print "main : $C";
+	print "main:\n$C";
     }
-    $pg->{main} = new Experimental::Eval($C, $pg->{src}, 0);
+    $pg->{main} = eval $C;
+    die if $@;
     if ($debug) {
 	print "\n". "-"x75 . "\n";
-	print "reply: $reply";
+	print "reply:\n$reply";
     }
-    $pg->{reply} = new Experimental::Eval($reply, $pg->{src}, $reply_line);
+    $pg->{reply} = eval $reply;
+    die if $@;
     if ($debug) {
 	print "\n". "-"x75 . "\n";
     }
@@ -74,18 +75,11 @@ sub reload {
 
 sub ok {
     my ($pg) = @_;
-    defined $pg->{main} and defined $pg->{reply};
+    $pg->{main} and $pg->{reply};
 }
 
-sub do_reply {
-    my ($pg) = @_;
-    $pg->{reply}->x() if $pg->{reply}->ok;
-}
-
-sub do_main {
-    my ($pg) = @_;
-    $pg->{main}->x();
-}
+sub do_reply { $_[0]->{reply}->(); }
+sub do_main { $_[0]->{main}->(); }
 
 package HTML::PHTML;
 use strict;
@@ -93,42 +87,59 @@ use integer;
 use Carp;
 use vars qw($VERSION);
 
-$VERSION='1.02';
+$VERSION='1.03';
 
 sub new {
     my ($class, $dir) = @_;
+    my $noappend = sub {
+	my $l = shift;
+	($l =~ m/^\s*\}/ or
+	 $l =~ m/^\s*my/ or
+	 $l =~ m/^\s*try_(?:read|update|abort_only)/  #for ObjStore
+	 );
+    };
     my $pkg = caller();
-    my $o = bless { DIR => $dir, PACKAGE => $pkg, DEBUG=>0 }, $class;
-    for my $f (glob("$dir/*.phtml")) {
-	$f =~ s|^$dir/(.+)\.phtml$|$1|;
-	$o->reload($f);
-    }
+    my $o = bless {
+	dir => $dir, 'package' => $pkg, noappend => $noappend,
+	debug=>0, initialized => 0, pages => {},
+    }, $class;
     $o;
 }
 
-sub reload {
-    my ($o, $name) = @_;
-    $name =~ s/\.phtml$//;
-    $o->{$name} ||= new HTML::PHTML::Page($o->{PACKAGE}, "$o->{DIR}/$name.phtml");
-    my $pg = $o->{$name};
-    $pg->reload($o->{DEBUG});
+sub set_noappend { $_[0]->{noappend} = $_[1]; }
+
+sub initialize {
+    my ($o) = @_;
+    return if $o->{initialized};
+    $o->{initialized} = 1;
+    for my $f (glob("$o->{dir}/*.phtml")) {
+	$f =~ s|^$o->{dir}/(.+)\.phtml$|$1|;
+	my $pg = $o->page($f);
+	$pg->reload($o->{debug});
+    }
 }
 
 sub debug {
     my ($o, $yes) = @_;
-    $o->{DEBUG} = $yes;
+    $o->{debug} = $yes;
+}
+
+sub page {
+    my ($o, $name) = @_;
+    $name =~ s/\.phtml$//;
+    $o->{pages}{$name} ||=
+	new HTML::PHTML::Page($o->{'package'}, "$o->{dir}/$name.phtml",
+			      $o->{noappend});
+    $o->{pages}{$name};
 }
 
 sub x {
     my ($o, $name) = @_;
-    $name =~ s/\.phtml$//;
-    $o->reload($name);
-    my $pg = $o->{$name};
-    die "Problems loading page '$name'" if !$pg->ok;
-    my @replies = keys %$o;
-    for my $k (@replies) {
-	my $pg = $o->{$k};
-	next if ref $pg ne 'HTML::PHTML::Page';  # hack XXX
+    $o->initialize;
+    my $pg = $o->page($name);
+    $pg->reload($o->{'debug'});
+    die "Issues loading page '$name'" if !$pg->ok;
+    for my $pg (values %{$o->{pages}}) {
 	my $ret=0;
 	$ret = $pg->do_reply;
 	return $ret if $ret;
@@ -148,8 +159,9 @@ HTML::PHTML - "Perl Embedded HTML" Page Cache
     use vars qw($PHTML $B);
     require HTML::PHTML;
 
+    my $debug=1;
     $B = '';
-    $PHTML = new HTML::PHTML("$FindBin::Bin/../lib/bm") if !$PHTML;
+    $PHTML = new HTML::PHTML("$FindBin::Bin/../lib/phtml", $debug) if !$PHTML;
     $PHTML->x($page_name);
     print $B;
 
@@ -247,10 +259,11 @@ next page.
     0;
  } :>
 
-=head1 BUGS
+=head1 TODO
 
-The parser should be slightly more customizable so we can factor out
-the ObjStore specific stuff.
+Use a search path instead of a single phtml directory.
+
+=head1 BUGS
 
 Listen to REFERER to avoid running through all the reply handlers?
 
@@ -259,12 +272,11 @@ Avoid globals?
 =head1 AUTHOR
 
 Copyright (c) 1997 Joshua Nathaniel Pritikin.  All rights reserved.
-
 This package is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-Apache/mod_perl or FastCGI, C<ObjStore>, C<FindBin>, and C<Experimental::Eval>.
+Apache/mod_perl or FastCGI, C<ObjStore>, and C<FindBin>.
 
 =cut

@@ -1,6 +1,6 @@
 # -*-perl-*-
 
-sub ok { print "ok $tx\n"; $tx++; }  # this is a dubious aide
+sub ok { print "ok $tx\n"; $tx++; }
 sub not_ok { print "not ok $tx\n"; $tx++; }
 
 BEGIN { $| = 1; $tx=1; print "1..3\n"; }
@@ -25,7 +25,7 @@ sub is_cmd { my $yes = $cmd eq shift; $cmd=''; $yes }
 
 $cmd = '';
 chdir $FindBin::Bin or die "chdir $FindBin::Bin: $!";
-$ph = new HTML::PHTML($FindBin::Bin);
+$ph = new HTML::PHTML($FindBin::Bin, 0);
 #$ph->debug(1);
 
 sub go {
@@ -36,8 +36,8 @@ sub go {
     print $fh $B;
 }
 
-# also see Test::Output
 sub check {
+    # also see Test::Output (via CPAN)
     my ($new,$old) = @_;
     if (-e $old) {
 	system("diff $old $new")==0? ok:not_ok;
